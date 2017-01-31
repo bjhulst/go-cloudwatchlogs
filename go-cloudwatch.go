@@ -39,7 +39,7 @@ func getlogs(group *string, Stream *string) {
 		return
 	}
 	if len(resp.Events) > 0 {
-		fmt.Println(*Stream)
+		fmt.Println(fmt.Sprintf("\nStream %s:\n", *Stream))
 	}
 	for _, e := range resp.Events {
 		fmt.Println(*e.Message)
@@ -49,7 +49,7 @@ func getlogs(group *string, Stream *string) {
 func getstreams(groupname *string) {
 	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
 	params := &cloudwatchlogs.DescribeLogStreamsInput{
-		LogGroupName: aws.String(*groupname), // Required
+		LogGroupName: aws.String(*groupname),
 		Descending:   aws.Bool(true),
 		OrderBy:      aws.String("LogStreamName"),
 	}
