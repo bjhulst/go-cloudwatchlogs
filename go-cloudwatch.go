@@ -73,35 +73,7 @@ func getstreams(groupname *string) {
 	}
 }
 
-/*
-func getloggroups() {
-	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
-	params := &cloudwatchlogs.DescribeLogGroupsInput{}
-	resp, err := svc.DescribeLogGroups(params)
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	var match bool = false
-	numgroups := len(resp.LogGroups)
-	r, _ := regexp.Compile("(?i)" + *cliGroup + ".*")
-	pulledgroup := ""
-	for i := 0; i < numgroups; i++ {
-		pulledgroup = *resp.LogGroups[i].LogGroupName
-		match = r.MatchString(pulledgroup)
-		if match {
-			fmt.Println("\nLog group:")
-			fmt.Println(pulledgroup)
-			getstreams(&pulledgroup)
-		}
-	}
-}
-*/
-
 func main() {
 	kingpin.Parse()
-	//	getloggroups()
 	getstreams(cliGroup)
 }
