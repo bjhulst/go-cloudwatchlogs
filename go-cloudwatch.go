@@ -12,18 +12,18 @@ import (
 )
 
 var (
-	cliRegion      = kingpin.Flag("region", "Region which logs reside").Default("ap-southeast-2").String()
-	cliGroup       = kingpin.Flag("group", "CloudWatch Logs group").Required().String()
-	cliStream      = kingpin.Flag("stream", "CloudWatch Logs stream").String()
-	cliStart       = kingpin.Flag("start", "Time ago to search from").Default("10m").String()
-	clienv         = kingpin.Flag("env", "environment to filter by").Default(".").String()
-	cliListStreams = kingpin.Flag("list-streams", "list streams for log group").Short('l').HintOptions(" ").Bool()
+	cliRegion = kingpin.Flag("region", "Region which logs reside").Default("ap-southeast-2").String()
+	cliGroup  = kingpin.Flag("group", "CloudWatch Logs group").Required().String()
+	cliStream = kingpin.Flag("stream", "CloudWatch Logs stream").String()
+	cliStart  = kingpin.Flag("start", "Time ago to search from").Default("10m").String()
+	cliEnd    = kingpin.Flag("end", "Time ago to end search").Default("0").String()
 )
 
 func getlogs(group *string, Stream *string) {
-	dist, _ := time.ParseDuration(*cliStart)
-	timefrom := aws.TimeUnixMilli(time.Now().Add(-dist).UTC())
-	timeto := aws.TimeUnixMilli(time.Now().UTC())
+	diststart, _ := time.ParseDuration(*cliStart)
+	distend, _ := time.ParseDuration(*cliEnd)
+	timefrom := aws.TimeUnixMilli(time.Now().Add(-diststart).UTC())
+	timeto := aws.TimeUnixMilli(time.Now().Add(-distend).UTC())
 
 	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
 	resp, err := svc.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
@@ -38,7 +38,9 @@ func getlogs(group *string, Stream *string) {
 		fmt.Println(err)
 		return
 	}
-
+	if len(resp.Events) > 0 {
+		fmt.Println(*Stream)
+	}
 	for _, e := range resp.Events {
 		fmt.Println(*e.Message)
 	}
@@ -49,10 +51,7 @@ func getstreams(groupname *string) {
 	params := &cloudwatchlogs.DescribeLogStreamsInput{
 		LogGroupName: aws.String(*groupname), // Required
 		Descending:   aws.Bool(true),
-		Limit:        aws.Int64(4),
-		//    LogStreamNamePrefix: aws.String("LogStreamName"),
-		//   NextToken:           aws.String("NextToken"),
-		OrderBy: aws.String("LogStreamName"),
+		OrderBy:      aws.String("LogStreamName"),
 	}
 	resp, err := svc.DescribeLogStreams(params)
 
@@ -63,28 +62,21 @@ func getstreams(groupname *string) {
 
 	var match bool = false
 	numstreams := len(resp.LogStreams)
-	r, _ := regexp.Compile("(?i)" + *clienv + ".*")
+	r, _ := regexp.Compile("(?i)" + *cliStream + ".*")
 	pulledstream := ""
 	for i := 0; i < numstreams; i++ {
 		pulledstream = *resp.LogStreams[i].LogStreamName
 		match = r.MatchString(pulledstream)
 		if match {
-			//			output := fmt.Sprintf("\nStream %s\n", pulledstream)
-			//			fmt.Println(output)
-			fmt.Println(pulledstream)
 			getlogs(groupname, &pulledstream)
 		}
 	}
-	//  fmt.Println(*resp)
 }
 
+/*
 func getloggroups() {
 	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
-	params := &cloudwatchlogs.DescribeLogGroupsInput{
-	//		Limit:              aws.Int64(1),
-	//		LogGroupNamePrefix: aws.String("LogGroupName"),
-	//		NextToken:          aws.String("NextToken"),
-	}
+	params := &cloudwatchlogs.DescribeLogGroupsInput{}
 	resp, err := svc.DescribeLogGroups(params)
 
 	if err != nil {
@@ -102,28 +94,14 @@ func getloggroups() {
 		if match {
 			fmt.Println("\nLog group:")
 			fmt.Println(pulledgroup)
-			if len(*cliStream) > 0 {
-				//				fmt.Println("\nStream:")
-				output := fmt.Sprintf("\nStream %s\n", *cliStream)
-				fmt.Println(output)
-				//				getstreams(&pulledgroup)
-				getlogs(&pulledgroup, cliStream)
-			} else {
-				fmt.Println("\nStream(s):")
-				getstreams(&pulledgroup)
-			}
+			getstreams(&pulledgroup)
 		}
 	}
 }
+*/
 
 func main() {
 	kingpin.Parse()
-
-	if *cliListStreams {
-		fmt.Println("\nList of matched streams")
-		getstreams(cliGroup)
-		return
-	} else {
-		getloggroups()
-	}
+	//	getloggroups()
+	getstreams(cliGroup)
 }
