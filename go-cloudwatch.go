@@ -19,91 +19,90 @@ var (
 	cliEnd    = kingpin.Flag("end", "Time ago to end search").Default("0").String()
 )
 
-func getlogs(group *string, Stream *string) []int64 {
-	diststart, _ := time.ParseDuration(*cliStart)
-	distend, _ := time.ParseDuration(*cliEnd)
-	timefrom := aws.TimeUnixMilli(time.Now().Add(-diststart).UTC())
-	timeto := aws.TimeUnixMilli(time.Now().Add(-distend).UTC())
+func GetLogs(group, stream string) (Logs, error) {
+	var logs Logs
+
+	diststart, err := time.ParseDuration(*cliStart)
+	if err != nil {
+		return logs, err
+	}
+
+	distend, err := time.ParseDuration(*cliEnd)
+	if err != nil {
+		return logs, err
+	}
+
+	var (
+		timefrom = aws.TimeUnixMilli(time.Now().Add(-diststart).UTC())
+		timeto   = aws.TimeUnixMilli(time.Now().Add(-distend).UTC())
+	)
 
 	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
 	resp, err := svc.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
-		LogGroupName:  group,
-		LogStreamName: Stream,
+		LogGroupName:  aws.String(group),
+		LogStreamName: aws.String(stream),
 		StartFromHead: aws.Bool(true),
 		StartTime:     &timefrom,
 		EndTime:       &timeto,
 	})
-
 	if err != nil {
-		fmt.Println(err)
-		return nil
+		return logs, err
 	}
-	/*	if len(resp.Events) > 0 {
-			fmt.Println(fmt.Sprintf("\nStream %s:\n", *Stream))
-		}
-	*/
-	var stamp []int64
-	for _, e := range resp.Events {
-		// human readable time
-		//		timeoutput := time.Unix(*e.Timestamp/1000, 0).Format("15:04:05 02/01/06")
-		//		stamp = append(stamp, timeoutput)
 
-		//		msg := fmt.Sprintf("%s %s: %s", timeoutput, *Stream, *e.Message)
-		//		var stamp []string
-		//timeoutput := time.Unix(*e.Timestamp/1000, 0)
-		//fmt.Println(timeoutput)
-		stamp = append(stamp, *e.Timestamp/1000)
-		//fmt.Println(msg)
+	for _, e := range resp.Events {
+		logs = append(logs, &Log{
+			Stream:    stream,
+			Timestamp: time.Unix(*e.Timestamp/1000, 0),
+			Message:   *e.Message,
+		})
 	}
-	for i := 0; i < len(stamp); i++ {
-		//fmt.Println(stamp[i])
-	}
-	if len(stamp) > 0 {
-		return stamp
-	}
-	return nil
+
+	return logs, nil
 }
 
-func getstreams(groupname *string) {
+func GetStreams(groupname string) (Logs, error) {
+	var logs Logs
+
 	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
 	params := &cloudwatchlogs.DescribeLogStreamsInput{
-		LogGroupName: aws.String(*groupname),
+		LogGroupName: aws.String(groupname),
 		Descending:   aws.Bool(true),
 		OrderBy:      aws.String("LogStreamName"),
 	}
 	resp, err := svc.DescribeLogStreams(params)
-
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		return logs, err
 	}
 
-	var match bool = false
-	numstreams := len(resp.LogStreams)
-	r, _ := regexp.Compile("(?i)" + *cliStream + ".*")
-	pulledstream := ""
-	var slice []int64
-	var slice2 []int64
-	for i := 0; i < numstreams; i++ {
-		pulledstream = *resp.LogStreams[i].LogStreamName
-		match = r.MatchString(pulledstream)
-		if match {
-			slice = getlogs(groupname, &pulledstream)
-			if len(slice) > 0 {
-				//slice = append(slice, slice2)
-				//fmt.Println("current slice")
-				//fmt.Println(slice)
-				for i := 0; i < len(slice); i++ {
-					slice2 = append(slice2, slice[i])
-					///				slice2	fmt.Println(slice[i])
-				}
+	r, err := regexp.Compile("(?i)" + *cliStream + ".*")
+	if err != nil {
+		return logs, err
+	}
+
+	for _, s := range resp.LogStreams {
+		if r.MatchString(*s.LogStreamName) {
+			newLogs, err := GetLogs(groupname, *s.LogStreamName)
+			if err != nil {
+				return logs, err
+			}
+
+			if len(newLogs) > 0 {
+				logs = MergeLogs(logs, newLogs)
 			}
 		}
 	}
-	fmt.Println(slice2)
+
+	return logs, nil
 }
 
 func main() {
 	kingpin.Parse()
-	getstreams(cliGroup)
+	logs, err := GetStreams(*cliGroup)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, l := range logs {
+		fmt.Println(aws.TimeUnixMilli(l.Timestamp))
+	}
 }
