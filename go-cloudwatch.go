@@ -19,15 +19,15 @@ var (
 	cliEnd    = kingpin.Flag("end", "Time ago to end search").Default("0").String()
 )
 
-func GetLogs(group, stream string) (Logs, error) {
+func GetLogs(region, group, stream, start, end string) (Logs, error) {
 	var logs Logs
 
-	diststart, err := time.ParseDuration(*cliStart)
+	diststart, err := time.ParseDuration(start)
 	if err != nil {
 		return logs, err
 	}
 
-	distend, err := time.ParseDuration(*cliEnd)
+	distend, err := time.ParseDuration(end)
 	if err != nil {
 		return logs, err
 	}
@@ -37,7 +37,7 @@ func GetLogs(group, stream string) (Logs, error) {
 		timeto   = aws.TimeUnixMilli(time.Now().Add(-distend).UTC())
 	)
 
-	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
+	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: aws.String(region)})
 	resp, err := svc.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
 		LogGroupName:  aws.String(group),
 		LogStreamName: aws.String(stream),
@@ -60,12 +60,12 @@ func GetLogs(group, stream string) (Logs, error) {
 	return logs, nil
 }
 
-func GetStreams(groupname string) (Logs, error) {
+func GetStreams(region, group, stream, start, end string) (Logs, error) {
 	var logs Logs
 
-	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: cliRegion})
+	svc := cloudwatchlogs.New(session.New(), &aws.Config{Region: aws.String(region)})
 	params := &cloudwatchlogs.DescribeLogStreamsInput{
-		LogGroupName: aws.String(groupname),
+		LogGroupName: aws.String(group),
 		Descending:   aws.Bool(true),
 		OrderBy:      aws.String("LogStreamName"),
 	}
@@ -74,14 +74,14 @@ func GetStreams(groupname string) (Logs, error) {
 		return logs, err
 	}
 
-	r, err := regexp.Compile("(?i)" + *cliStream + ".*")
+	r, err := regexp.Compile("(?i)" + stream + ".*")
 	if err != nil {
 		return logs, err
 	}
 
 	for _, s := range resp.LogStreams {
 		if r.MatchString(*s.LogStreamName) {
-			newLogs, err := GetLogs(groupname, *s.LogStreamName)
+			newLogs, err := GetLogs(region, group, *s.LogStreamName, start, end)
 			if err != nil {
 				return logs, err
 			}
@@ -97,12 +97,12 @@ func GetStreams(groupname string) (Logs, error) {
 
 func main() {
 	kingpin.Parse()
-	logs, err := GetStreams(*cliGroup)
+	logs, err := GetStreams(*cliRegion, *cliGroup, *cliStream, *cliStart, *cliEnd)
 	if err != nil {
 		panic(err)
 	}
 
 	for _, l := range logs {
-		fmt.Println(aws.TimeUnixMilli(l.Timestamp))
+		fmt.Println(l.Message)
 	}
 }
