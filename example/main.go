@@ -17,7 +17,7 @@ var (
 
 func main() {
 	kingpin.Parse()
-	logs, err := cloudwatchlogs.GetStreams(*cliRegion, *cliGroup, *cliStream, *cliStart, *cliEnd)
+	logs, err := cloudwatchlogs.Events(*cliRegion, *cliGroup, *cliStream, *cliStart, *cliEnd)
 	if err != nil {
 		panic(err)
 	}

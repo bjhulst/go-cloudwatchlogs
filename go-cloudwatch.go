@@ -28,57 +28,94 @@ func Events(region, group, stream, start, end string) (Logs, error) {
 		to   = aws.TimeUnixMilli(time.Now().Add(-endDuration).UTC())
 	)
 
-	done := false
-
-	params := &cloudwatchlogs.DescribeLogStreamsInput{
-		LogGroupName:        aws.String(group),
-		LogStreamNamePrefix: aws.String(stream),
-		Descending:          aws.Bool(true),
+	streams, err := streams(svc, group, stream)
+	if err != nil {
+		return logs, err
 	}
 
-	for !done {
-		resp, err := svc.DescribeLogStreams(params)
+	for _, s := range streams {
+		// Ensure that we are not querying for streams which have finished prior to
+		if s.LastEventTimestamp != nil && *s.LastEventTimestamp < from {
+			continue
+		}
+
+		newLogs, err := events(svc, group, *s.LogStreamName, from, to)
 		if err != nil {
 			return logs, err
 		}
 
+		if len(newLogs) > 0 {
+			logs = MergeLogs(logs, newLogs)
+		}
+	}
+
+	return logs, nil
+}
+
+// Helper function to get Log Streams (with Token support).
+func streams(svc *cloudwatchlogs.CloudWatchLogs, group, prefix string) ([]*cloudwatchlogs.LogStream, error) {
+	var streams []*cloudwatchlogs.LogStream
+
+	params := &cloudwatchlogs.DescribeLogStreamsInput{
+		LogGroupName:        aws.String(group),
+		LogStreamNamePrefix: aws.String(prefix),
+		Descending:          aws.Bool(true),
+	}
+
+	for {
+		resp, err := svc.DescribeLogStreams(params)
+		if err != nil {
+			return streams, err
+		}
+
 		for _, s := range resp.LogStreams {
-			// Ensure that we are not querying for streams which have finished prior to
-			if s.LastEventTimestamp != nil && *s.LastEventTimestamp < from {
-				continue
-			}
-
-			var newLogs Logs
-
-			resp, err := svc.GetLogEvents(&cloudwatchlogs.GetLogEventsInput{
-				LogGroupName:  aws.String(group),
-				LogStreamName: s.LogStreamName,
-				StartFromHead: aws.Bool(true),
-				StartTime:     &from,
-				EndTime:       &to,
-			})
-			if err != nil {
-				return logs, err
-			}
-
-			for _, e := range resp.Events {
-				newLogs = append(newLogs, &Log{
-					Stream:    *s.LogStreamName,
-					Timestamp: time.Unix(*e.Timestamp/1000, 0),
-					Message:   *e.Message,
-				})
-			}
-
-			if len(newLogs) > 0 {
-				logs = MergeLogs(logs, newLogs)
-			}
+			streams = append(streams, s)
 		}
 
 		if resp.NextToken == nil {
-			done = true
-		} else {
-			params.NextToken = resp.NextToken
+			return streams, nil
 		}
+
+		params.NextToken = resp.NextToken
+	}
+
+	return streams, nil
+}
+
+// Helper function to get Events (with Token support).
+func events(svc *cloudwatchlogs.CloudWatchLogs, group, stream string, from, to int64) (Logs, error) {
+	var logs Logs
+
+	params := &cloudwatchlogs.GetLogEventsInput{
+		LogGroupName:  aws.String(group),
+		LogStreamName: aws.String(stream),
+		StartTime:     aws.Int64(from),
+		EndTime:       aws.Int64(to),
+	}
+
+	for {
+		resp, err := svc.GetLogEvents(params)
+		if err != nil {
+			return logs, err
+		}
+
+		if len(resp.Events) < 1 {
+			return logs, nil
+		}
+
+		for _, e := range resp.Events {
+			logs = append(logs, &Log{
+				Stream:    stream,
+				Timestamp: time.Unix(*e.Timestamp/1000, 0),
+				Message:   *e.Message,
+			})
+		}
+
+		if resp.NextForwardToken == nil {
+			return logs, nil
+		}
+
+		params.NextToken = resp.NextForwardToken
 	}
 
 	return logs, nil
