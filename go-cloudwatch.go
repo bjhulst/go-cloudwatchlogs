@@ -44,7 +44,7 @@ func Events(region, group, stream, start, end string) (Logs, error) {
 
 		for _, s := range resp.LogStreams {
 			// Ensure that we are not querying for streams which have finished prior to
-			if *s.LastEventTimestamp < from {
+			if s.LastEventTimestamp != nil && *s.LastEventTimestamp < from {
 				continue
 			}
 
