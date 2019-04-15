@@ -2,6 +2,7 @@ package cloudwatchlogs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -73,6 +74,11 @@ func getStreams(client *cloudwatchlogs.CloudWatchLogs, group, prefix string, sta
 		}
 
 		for _, stream := range resp.LogStreams {
+			// Ensure only logstreams with specified prefix are included.
+			if prefix != "" && strings.Index(*stream.LogStreamName, prefix) == 0 {
+				continue
+			}
+
 			if *stream.LastEventTimestamp < start {
 				return streams, nil
 			}
