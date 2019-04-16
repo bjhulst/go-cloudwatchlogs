@@ -75,7 +75,7 @@ func getStreams(client *cloudwatchlogs.CloudWatchLogs, group, prefix string, sta
 
 		for _, stream := range resp.LogStreams {
 			// Ensure only logstreams with specified prefix are included.
-			if prefix != "" && strings.Index(*stream.LogStreamName, prefix) == 0 {
+			if prefix != "" && strings.Index(*stream.LogStreamName, prefix) != 0 {
 				continue
 			}
 
