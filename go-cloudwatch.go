@@ -1,9 +1,6 @@
 package cloudwatchlogs
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 )
@@ -112,11 +109,7 @@ func getLogs(client *cloudwatchlogs.CloudWatchLogs, group string, streams []*str
 			return events, err
 		}
 
-		fmt.Printf("Found %d events\n", len(resp.Events))
-
 		events = append(events, resp.Events...)
-
-		fmt.Println(resp.SearchedLogStreams)
 
 		if resp.NextToken == nil {
 			return events, nil
