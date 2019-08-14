@@ -1,29 +1,11 @@
 package cloudwatchlogs
 
 import (
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 )
-
-// QueryParams which get passed to the Query function.
-type QueryParams struct {
-	Group  string
-	Prefix string
-	Start  int64
-	End    int64
-}
-
-// QueryOutput which gets returned fromm Query function.
-type QueryOutput struct {
-	Logs []Log
-}
-
-// Log which contains messages from streams.
-type Log struct {
-	Stream    string
-	Timestamp int64
-	Message   string
-}
 
 // Query for logs.
 func Query(client *cloudwatchlogs.CloudWatchLogs, params QueryParams) (QueryOutput, error) {
