@@ -34,7 +34,7 @@ for _, log := range resp.Logs {
 ```go
 import "github.com/previousnext/go-cloudwatchlogs"
 
-file := os.Open("/var/log/containers/path-to.log")
+file := os.Open("/var/log/containers/[namespace]_[pod]_[container]-foo.log")
 params := cloudwatchlogs.StreamParams{
     // AWS CloudWatch region. 
     Region:      "us-east-1",
