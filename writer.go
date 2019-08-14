@@ -17,7 +17,6 @@ import (
 	"github.com/previousnext/go-cloudwatchlogs/pkg/metadata"
 )
 
-
 // Stream the contents of a file to CloudWatch Logs.
 func Stream(params StreamParams) error {
 	namespace, pod, container, err := metadata.Extract(params.File)
